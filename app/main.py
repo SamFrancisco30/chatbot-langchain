@@ -3,13 +3,17 @@ import time
 from document_loader import load_and_split_pdfs
 from vector_store import create_vector_store, save_vector_store
 from chatbot import create_retrieval_qa_chain, load_llm
-from langchain_redis import RedisCache
+from langchain_redis import RedisSemanticCache
 from langchain.globals import set_llm_cache
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_huggingface import HuggingFaceEmbeddings
 
-def timed_completion(chain, user_input):
+
+def timed_completion(chain, user_input, chat_history):
     start_time = time.time()
-    result = chain.invoke({"input": user_input})
+    result = chain.invoke({"input": user_input, "chat_history": chat_history})
     end_time = time.time()
+    chat_history.extend([HumanMessage(content=user_input), AIMessage(content=result["answer"]),])
     return result, end_time - start_time
 
 def main():
@@ -26,11 +30,15 @@ def main():
     llm = load_llm("models/llama-2-7b-chat.Q4_K_M.gguf")
 
     # Create a Redis cache instance
-    redis_cache = RedisCache(redis_url=REDIS_URL)
+    redis_cache = RedisSemanticCache(redis_url=REDIS_URL, 
+                                     distance_threshold=0.1,
+                                     embeddings=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
     set_llm_cache(redis_cache)
 
-    retrieve_qa_chain = create_retrieval_qa_chain(llm, vector_store)
+    rag_chain = create_retrieval_qa_chain(llm, vector_store)
     print("Chatbot is ready! Type 'exit' to end the conversation.")
+
+    chat_history = []
         
     while True:
         user_input = input("\nType in your question: ")
@@ -38,8 +46,8 @@ def main():
             break
 
         # response = retrieve_qa_chain.invoke({"input": user_input})
-        result, time = timed_completion(retrieve_qa_chain, user_input)
-        print(f"Result: {result['answer']}\nTime: {time:.2f} seconds\n")
+        result, time = timed_completion(rag_chain, user_input, chat_history)
+        print(f"\n\nResult:{result['answer']}\n\n Time: {time:.2f} seconds\n")
 
 
 if __name__ == "__main__":

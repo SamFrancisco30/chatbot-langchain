@@ -3,26 +3,48 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.chains import create_history_aware_retriever
+from langchain_core.prompts import MessagesPlaceholder
 
 def create_retrieval_qa_chain(llm, vector_store):
     """
     Create a RetrievalQA chain for querying the vector store.
     """
-#     prompt = ChatPromptTemplate.from_template("""Document: \n{context}\n  Question: \n{input}\n INSTRUCTIONS:
-# You are a helpful assistant for the [Software Name] application. Your task is to answer the user's question based on the provided DOCUMENT text. Follow these guidelines: 
-#     1. Accuracy: Ensure your answer is grounded in the facts of the DOCUMENT. Do not speculate or provide information outside the document. 2. Relevance: Focus on answering the user's specific question about the software. Avoid unnecessary details.
-#     3. Clarity: Provide a clear and concise answer that directly addresses the user's question. Avoid unnecessary jargon or technical terms. 4. Completeness: Provide a complete answer to the user's question. If the question has multiple parts, ensure you address each part.
-#                                               5. Tone: Maintain a friendly and professional tone throughout the conversation. Avoid being overly formal or casual. 6. Handling Ambiguity: If the question is unclear or the document does not provide enough information, ask the user for clarification or additional details.""")
-    
-    prompt = ChatPromptTemplate.from_template("""Answer the question concisely using the provided context.\n\n Context: \n{context}\n  Question: \n{input}\n\n  Answer: """)
-    combined_documents_chain = create_stuff_documents_chain(
-        llm, prompt
+    retriever=vector_store.as_retriever(search_kwargs={"k": 3})
+    contextualize_q_system_prompt = (
+        "Given a chat history and the latest user question "
+        "which might reference context in the chat history, "
+        "formulate a standalone question which can be understood "
+        "without the chat history. Do NOT answer the question, "
+        "just reformulate it if needed and otherwise return it as is."
     )
-    retrieval_chain  = create_retrieval_chain(
-        retriever=vector_store.as_retriever(search_kwargs={"k": 3}),
-        combine_docs_chain =combined_documents_chain,
+    contextualize_q_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
     )
-    return retrieval_chain
+    history_aware_retriever = create_history_aware_retriever(
+        llm, retriever, contextualize_q_prompt
+    )
+    system_prompt = (
+        "Based on the following context, answer the question concisely but with enough details."
+        "\n\n"
+        "Context:\n{context}"
+        "\n\n"
+        "Answer: "
+    )
+    qa_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+    return rag_chain
 
 def load_llm(model_path):
     """
@@ -34,7 +56,7 @@ def load_llm(model_path):
         n_batch=512,
         n_ctx=4096,
         f16_kv=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]),
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]),
         verbose=False,
     )
     return llm
