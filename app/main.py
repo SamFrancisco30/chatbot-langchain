@@ -1,9 +1,16 @@
 import os
+import time
 from document_loader import load_and_split_pdfs
 from vector_store import create_vector_store, save_vector_store
 from chatbot import create_retrieval_qa_chain, load_llm
 from langchain_redis import RedisCache
 from langchain.globals import set_llm_cache
+
+def timed_completion(chain, user_input):
+    start_time = time.time()
+    result = chain.invoke({"input": user_input})
+    end_time = time.time()
+    return result, end_time - start_time
 
 def main():
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -30,7 +37,10 @@ def main():
         if user_input.lower() == "exit":
             break
 
-        retrieve_qa_chain.invoke({"input": user_input})
+        # response = retrieve_qa_chain.invoke({"input": user_input})
+        result, time = timed_completion(retrieve_qa_chain, user_input)
+        print(f"Result: {result['answer']}\nTime: {time:.2f} seconds\n")
+
 
 if __name__ == "__main__":
     main()

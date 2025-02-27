@@ -2,7 +2,8 @@
 models/
 
 # data
-data/
+data/documents/
+data/vector_store/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
