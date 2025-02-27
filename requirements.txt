@@ -1,0 +1,10 @@
+langchain
+faiss-cpu
+pypdf
+redis
+python-dotenv
+transformers
+sentence-transformers
+torch
+llama-cpp-python
+langchain-community
