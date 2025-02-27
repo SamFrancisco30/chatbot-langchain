@@ -1,10 +1,8 @@
-
 import os
 from document_loader import load_and_split_pdfs
 from vector_store import create_vector_store, save_vector_store
 from chatbot import create_retrieval_qa_chain, load_llm
-from redis import Redis
-from langchain_redis import RedisCache, RedisSemanticCache
+from langchain_redis import RedisCache
 from langchain.globals import set_llm_cache
 
 def main():
@@ -31,7 +29,7 @@ def main():
         user_input = input("\nType in your question: ")
         if user_input.lower() == "exit":
             break
-        
+
         retrieve_qa_chain.invoke({"input": user_input})
 
 if __name__ == "__main__":
