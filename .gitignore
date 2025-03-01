@@ -5,6 +5,9 @@ models/
 data/documents/
 data/vector_store/
 
+# dataset
+test/dataset/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

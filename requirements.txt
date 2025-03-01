@@ -8,3 +8,5 @@ sentence-transformers
 torch
 llama-cpp-python
 langchain-community
+langchain-core
+langchain-huggingface
